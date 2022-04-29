@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,30 @@ class NamedContributorsMapAdapterTests {
 	}
 
 	@Test
+	void createWhenMapContainsNullValueThrowsException() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> new TestNamedContributorsMapAdapter<>(Collections.singletonMap("test", null),
+						Function.identity()))
+				.withMessage("Map must not contain null values");
+	}
+
+	@Test
+	void createWhenMapContainsNullKeyThrowsException() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> new TestNamedContributorsMapAdapter<>(Collections.singletonMap(null, "test"),
+						Function.identity()))
+				.withMessage("Map must not contain null keys");
+	}
+
+	@Test
+	void createWhenMapContainsKeyWithSlashThrowsException() {
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> new TestNamedContributorsMapAdapter<>(Collections.singletonMap("test/key", "test"),
+						Function.identity()))
+				.withMessage("Map keys must not contain a '/'");
+	}
+
+	@Test
 	void iterateReturnsAdaptedEntries() {
 		TestNamedContributorsMapAdapter<String> adapter = createAdapter();
 		Iterator<NamedContributor<String>> iterator = adapter.iterator();
@@ -75,7 +99,7 @@ class NamedContributorsMapAdapterTests {
 	}
 
 	private TestNamedContributorsMapAdapter<String> createAdapter() {
-		Map<String, String> map = new LinkedHashMap<String, String>();
+		Map<String, String> map = new LinkedHashMap<>();
 		map.put("one", "one");
 		map.put("two", "two");
 		TestNamedContributorsMapAdapter<String> adapter = new TestNamedContributorsMapAdapter<>(map, this::reverse);

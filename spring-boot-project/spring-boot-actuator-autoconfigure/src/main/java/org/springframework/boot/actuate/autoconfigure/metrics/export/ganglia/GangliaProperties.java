@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Stephane Nicoll
  * @since 2.0.0
  */
-@ConfigurationProperties(prefix = "management.metrics.export.ganglia")
+@ConfigurationProperties(prefix = "management.ganglia.metrics.export")
 public class GangliaProperties {
 
 	/**
@@ -47,7 +47,7 @@ public class GangliaProperties {
 	/**
 	 * Base time unit used to report rates.
 	 */
-	private TimeUnit rateUnits = TimeUnit.SECONDS;
+	private TimeUnit rateUnits;
 
 	/**
 	 * Base time unit used to report durations.
@@ -57,7 +57,7 @@ public class GangliaProperties {
 	/**
 	 * Ganglia protocol version. Must be either 3.1 or 3.0.
 	 */
-	private String protocolVersion = "3.1";
+	private String protocolVersion;
 
 	/**
 	 * UDP addressing mode, either unicast or multicast.
@@ -96,28 +96,12 @@ public class GangliaProperties {
 		this.step = step;
 	}
 
-	public TimeUnit getRateUnits() {
-		return this.rateUnits;
-	}
-
-	public void setRateUnits(TimeUnit rateUnits) {
-		this.rateUnits = rateUnits;
-	}
-
 	public TimeUnit getDurationUnits() {
 		return this.durationUnits;
 	}
 
 	public void setDurationUnits(TimeUnit durationUnits) {
 		this.durationUnits = durationUnits;
-	}
-
-	public String getProtocolVersion() {
-		return this.protocolVersion;
-	}
-
-	public void setProtocolVersion(String protocolVersion) {
-		this.protocolVersion = protocolVersion;
 	}
 
 	public GMetric.UDPAddressingMode getAddressingMode() {

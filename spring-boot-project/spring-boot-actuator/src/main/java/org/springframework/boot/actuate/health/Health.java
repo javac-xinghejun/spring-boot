@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,11 @@ public final class Health extends HealthComponent {
 		Assert.notNull(builder, "Builder must not be null");
 		this.status = builder.status;
 		this.details = Collections.unmodifiableMap(builder.details);
+	}
+
+	Health(Status status, Map<String, Object> details) {
+		this.status = status;
+		this.details = details;
 	}
 
 	/**
@@ -188,6 +193,8 @@ public final class Health extends HealthComponent {
 
 		private Map<String, Object> details;
 
+		private Throwable exception;
+
 		/**
 		 * Create new Builder instance.
 		 */
@@ -226,6 +233,7 @@ public final class Health extends HealthComponent {
 		 */
 		public Builder withException(Throwable ex) {
 			Assert.notNull(ex, "Exception must not be null");
+			this.exception = ex;
 			return withDetail("error", ex.getClass().getName() + ": " + ex.getMessage());
 		}
 
@@ -322,6 +330,14 @@ public final class Health extends HealthComponent {
 		 */
 		public Health build() {
 			return new Health(this);
+		}
+
+		/**
+		 * Return the {@link Exception}.
+		 * @return the exception or {@code null} if the builder has no exception
+		 */
+		Throwable getException() {
+			return this.exception;
 		}
 
 	}

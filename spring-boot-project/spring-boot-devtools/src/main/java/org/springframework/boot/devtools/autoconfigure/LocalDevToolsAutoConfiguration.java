@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import java.io.File;
 import java.net.URL;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,6 +35,7 @@ import org.springframework.boot.devtools.classpath.ClassPathRestartStrategy;
 import org.springframework.boot.devtools.classpath.PatternClassPathRestartStrategy;
 import org.springframework.boot.devtools.filewatch.FileSystemWatcher;
 import org.springframework.boot.devtools.filewatch.FileSystemWatcherFactory;
+import org.springframework.boot.devtools.filewatch.SnapshotStateRepository;
 import org.springframework.boot.devtools.livereload.LiveReloadServer;
 import org.springframework.boot.devtools.restart.ConditionalOnInitializedRestarter;
 import org.springframework.boot.devtools.restart.RestartScope;
@@ -53,7 +58,7 @@ import org.springframework.util.StringUtils;
  * @author Vladimir Tsanev
  * @since 1.3.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @ConditionalOnInitializedRestarter
 @EnableConfigurationProperties(DevToolsProperties.class)
 public class LocalDevToolsAutoConfiguration {
@@ -93,6 +98,8 @@ public class LocalDevToolsAutoConfiguration {
 	@ConditionalOnProperty(prefix = "spring.devtools.restart", name = "enabled", matchIfMissing = true)
 	static class RestartConfiguration {
 
+		private static final Log restarterLogger = LogFactory.getLog(Restarter.class);
+
 		private final DevToolsProperties properties;
 
 		RestartConfiguration(DevToolsProperties properties) {
@@ -104,6 +111,10 @@ public class LocalDevToolsAutoConfiguration {
 				FileSystemWatcherFactory fileSystemWatcherFactory) {
 			return (event) -> {
 				if (event.isRestartRequired()) {
+					if (restarterLogger.isDebugEnabled()) {
+						restarterLogger.debug(
+								"Application restart required due to the following changes: " + event.getChangeSet());
+					}
 					Restarter.getInstance().restart(new FileWatchingFailureHandler(fileSystemWatcherFactory));
 				}
 			};
@@ -141,14 +152,14 @@ public class LocalDevToolsAutoConfiguration {
 		private FileSystemWatcher newFileSystemWatcher() {
 			Restart restartProperties = this.properties.getRestart();
 			FileSystemWatcher watcher = new FileSystemWatcher(true, restartProperties.getPollInterval(),
-					restartProperties.getQuietPeriod());
+					restartProperties.getQuietPeriod(), SnapshotStateRepository.STATIC);
 			String triggerFile = restartProperties.getTriggerFile();
 			if (StringUtils.hasLength(triggerFile)) {
 				watcher.setTriggerFilter(new TriggerFileFilter(triggerFile));
 			}
 			List<File> additionalPaths = restartProperties.getAdditionalPaths();
 			for (File path : additionalPaths) {
-				watcher.addSourceFolder(path.getAbsoluteFile());
+				watcher.addSourceDirectory(path.getAbsoluteFile());
 			}
 			return watcher;
 		}

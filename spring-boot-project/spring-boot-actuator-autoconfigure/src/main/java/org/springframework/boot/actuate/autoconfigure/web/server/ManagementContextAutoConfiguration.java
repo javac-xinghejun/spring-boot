@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import org.springframework.boot.LazyInitializationBeanFactoryPostProcessor;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.web.ManagementContextFactory;
 import org.springframework.boot.actuate.autoconfigure.web.ManagementContextType;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureOrder;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
@@ -55,7 +56,7 @@ import org.springframework.util.Assert;
  * @author Andy Wilkinson
  * @since 2.0.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @AutoConfigureOrder(Ordered.LOWEST_PRECEDENCE)
 @EnableConfigurationProperties({ WebEndpointProperties.class, ManagementServerProperties.class })
 public class ManagementContextAutoConfiguration {
@@ -73,6 +74,7 @@ public class ManagementContextAutoConfiguration {
 		@Override
 		public void afterSingletonsInstantiated() {
 			verifySslConfiguration();
+			verifyAddressConfiguration();
 			if (this.environment instanceof ConfigurableEnvironment) {
 				addLocalManagementPortPropertyAlias((ConfigurableEnvironment) this.environment);
 			}
@@ -81,6 +83,12 @@ public class ManagementContextAutoConfiguration {
 		private void verifySslConfiguration() {
 			Boolean enabled = this.environment.getProperty("management.server.ssl.enabled", Boolean.class, false);
 			Assert.state(!enabled, "Management-specific SSL cannot be configured as the management "
+					+ "server is not listening on a separate port");
+		}
+
+		private void verifyAddressConfiguration() {
+			Object address = this.environment.getProperty("management.server.address");
+			Assert.state(address == null, "Management-specific server address cannot be configured as the management "
 					+ "server is not listening on a separate port");
 		}
 

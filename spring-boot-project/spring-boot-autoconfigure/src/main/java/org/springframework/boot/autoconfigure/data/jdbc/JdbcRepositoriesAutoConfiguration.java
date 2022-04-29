@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.boot.autoconfigure.data.jdbc;
 
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -28,7 +28,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jdbc.repository.config.AbstractJdbcConfiguration;
 import org.springframework.data.jdbc.repository.config.EnableJdbcRepositories;
-import org.springframework.data.jdbc.repository.config.JdbcConfiguration;
 import org.springframework.data.jdbc.repository.config.JdbcRepositoryConfigExtension;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -45,13 +44,11 @@ import org.springframework.transaction.PlatformTransactionManager;
  * @since 2.1.0
  * @see EnableJdbcRepositories
  */
-@SuppressWarnings("deprecation")
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(after = { JdbcTemplateAutoConfiguration.class, DataSourceTransactionManagerAutoConfiguration.class })
 @ConditionalOnBean({ NamedParameterJdbcOperations.class, PlatformTransactionManager.class })
 @ConditionalOnClass({ NamedParameterJdbcOperations.class, AbstractJdbcConfiguration.class })
 @ConditionalOnProperty(prefix = "spring.data.jdbc.repositories", name = "enabled", havingValue = "true",
 		matchIfMissing = true)
-@AutoConfigureAfter({ JdbcTemplateAutoConfiguration.class, DataSourceTransactionManagerAutoConfiguration.class })
 public class JdbcRepositoriesAutoConfiguration {
 
 	@Configuration(proxyBeanMethods = false)
@@ -61,8 +58,8 @@ public class JdbcRepositoriesAutoConfiguration {
 
 	}
 
-	@Configuration
-	@ConditionalOnMissingBean({ AbstractJdbcConfiguration.class, JdbcConfiguration.class })
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnMissingBean(AbstractJdbcConfiguration.class)
 	static class SpringBootJdbcConfiguration extends AbstractJdbcConfiguration {
 
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,34 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.springframework.boot.actuate.autoconfigure.security.servlet;
 
-import java.util.ArrayList;
+import java.io.IOException;
+import java.time.Duration;
 import java.util.Base64;
-import java.util.List;
+import java.util.function.Supplier;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 
-import org.springframework.boot.actuate.endpoint.EndpointId;
-import org.springframework.boot.actuate.endpoint.ExposableEndpoint;
-import org.springframework.boot.actuate.endpoint.Operation;
+import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.web.server.ManagementContextAutoConfiguration;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
-import org.springframework.boot.actuate.endpoint.web.PathMappedEndpoint;
-import org.springframework.boot.actuate.endpoint.web.PathMappedEndpoints;
-import org.springframework.boot.autoconfigure.logging.ConditionEvaluationReportLoggingListener;
-import org.springframework.boot.logging.LogLevel;
+import org.springframework.boot.actuate.endpoint.web.EndpointServlet;
+import org.springframework.boot.actuate.endpoint.web.annotation.ServletEndpoint;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.context.assertj.AssertableWebApplicationContext;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.test.web.reactive.server.WebTestClient;
-
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
 
 /**
  * Abstract base class for {@link EndpointRequest} tests.
@@ -48,8 +52,6 @@ import static org.mockito.Mockito.mock;
  * @author Madhura Bhave
  */
 abstract class AbstractEndpointRequestIntegrationTests {
-
-	protected abstract WebApplicationContextRunner getContextRunner();
 
 	@Test
 	void toEndpointShouldMatch() {
@@ -61,13 +63,12 @@ abstract class AbstractEndpointRequestIntegrationTests {
 
 	@Test
 	void toAllEndpointsShouldMatch() {
-		getContextRunner().withInitializer(new ConditionEvaluationReportLoggingListener(LogLevel.INFO))
-				.withPropertyValues("spring.security.user.password=password").run((context) -> {
-					WebTestClient webTestClient = getWebTestClient(context);
-					webTestClient.get().uri("/actuator/e2").exchange().expectStatus().isUnauthorized();
-					webTestClient.get().uri("/actuator/e2").header("Authorization", getBasicAuth()).exchange()
-							.expectStatus().isOk();
-				});
+		getContextRunner().withPropertyValues("spring.security.user.password=password").run((context) -> {
+			WebTestClient webTestClient = getWebTestClient(context);
+			webTestClient.get().uri("/actuator/e2").exchange().expectStatus().isUnauthorized();
+			webTestClient.get().uri("/actuator/e2").header("Authorization", getBasicAuth()).exchange().expectStatus()
+					.isOk();
+		});
 	}
 
 	@Test
@@ -79,10 +80,22 @@ abstract class AbstractEndpointRequestIntegrationTests {
 		});
 	}
 
+	protected final WebApplicationContextRunner getContextRunner() {
+		return createContextRunner().withPropertyValues("management.endpoints.web.exposure.include=*")
+				.withUserConfiguration(BaseConfiguration.class, SecurityConfiguration.class).withConfiguration(
+						AutoConfigurations.of(JacksonAutoConfiguration.class, SecurityAutoConfiguration.class,
+								UserDetailsServiceAutoConfiguration.class, EndpointAutoConfiguration.class,
+								WebEndpointAutoConfiguration.class, ManagementContextAutoConfiguration.class));
+
+	}
+
+	protected abstract WebApplicationContextRunner createContextRunner();
+
 	protected WebTestClient getWebTestClient(AssertableWebApplicationContext context) {
 		int port = context.getSourceApplicationContext(AnnotationConfigServletWebServerApplicationContext.class)
 				.getWebServer().getPort();
-		return WebTestClient.bindToServer().baseUrl("http://localhost:" + port).build();
+		return WebTestClient.bindToServer().baseUrl("http://localhost:" + port).responseTimeout(Duration.ofMinutes(5))
+				.build();
 	}
 
 	String getBasicAuth() {
@@ -108,19 +121,8 @@ abstract class AbstractEndpointRequestIntegrationTests {
 		}
 
 		@Bean
-		PathMappedEndpoints pathMappedEndpoints() {
-			List<ExposableEndpoint<?>> endpoints = new ArrayList<>();
-			endpoints.add(mockEndpoint("e1"));
-			endpoints.add(mockEndpoint("e2"));
-			endpoints.add(mockEndpoint("e3"));
-			return new PathMappedEndpoints("/actuator", () -> endpoints);
-		}
-
-		private TestPathMappedEndpoint mockEndpoint(String id) {
-			TestPathMappedEndpoint endpoint = mock(TestPathMappedEndpoint.class);
-			given(endpoint.getEndpointId()).willReturn(EndpointId.of(id));
-			given(endpoint.getRootPath()).willReturn(id);
-			return endpoint;
+		TestServletEndpoint servletEndpoint() {
+			return new TestServletEndpoint();
 		}
 
 	}
@@ -155,7 +157,13 @@ abstract class AbstractEndpointRequestIntegrationTests {
 
 	}
 
-	public interface TestPathMappedEndpoint extends ExposableEndpoint<Operation>, PathMappedEndpoint {
+	@ServletEndpoint(id = "se1")
+	static class TestServletEndpoint implements Supplier<EndpointServlet> {
+
+		@Override
+		public EndpointServlet get() {
+			return new EndpointServlet(ExampleServlet.class);
+		}
 
 	}
 
@@ -163,8 +171,9 @@ abstract class AbstractEndpointRequestIntegrationTests {
 	static class SecurityConfiguration {
 
 		@Bean
-		WebSecurityConfigurerAdapter webSecurityConfigurerAdapter() {
-			return new WebSecurityConfigurerAdapter() {
+		@SuppressWarnings("deprecation")
+		org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter webSecurityConfigurerAdapter() {
+			return new org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter() {
 
 				@Override
 				protected void configure(HttpSecurity http) throws Exception {
@@ -178,6 +187,14 @@ abstract class AbstractEndpointRequestIntegrationTests {
 				}
 
 			};
+		}
+
+	}
+
+	static class ExampleServlet extends HttpServlet {
+
+		@Override
+		protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		}
 
 	}
